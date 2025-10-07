@@ -467,7 +467,7 @@ This project is developed for educational purposes as part of an R&D assignment.
 
 ## 👨‍💻 Author
 
-**Your Name**  
+**Rakesh Vemula**  
 R&D Assignment - Mobile Image Processing  
 Android Development with OpenCV & JNI  
 
