@@ -10,11 +10,17 @@ public class ImageProcessor {
         GRAYSCALE,
         BRIGHTNESS,
         CONTRAST,
-        INVERT
+        INVERT,
+        EDGE_DETECTION
     }
 
     public static Bitmap applyFilter(Bitmap input, FilterType filter) {
         if (input == null) return null;
+
+        // Use native processing for grayscale and edge detection
+        if (filter == FilterType.GRAYSCALE || filter == FilterType.EDGE_DETECTION) {
+            return NativeImageProcessor.processWithNative(input, filter);
+        }
 
         Bitmap output = Bitmap.createBitmap(input.getWidth(), input.getHeight(), input.getConfig());
 
@@ -64,6 +70,66 @@ public class ImageProcessor {
             default:
                 return pixel;
         }
+    }
+
+    private static Bitmap applyEdgeDetection(Bitmap input) {
+        int width = input.getWidth();
+        int height = input.getHeight();
+
+        // First convert to grayscale
+        int[][] grayPixels = new int[width][height];
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                int pixel = input.getPixel(x, y);
+                int r = Color.red(pixel);
+                int g = Color.green(pixel);
+                int b = Color.blue(pixel);
+                grayPixels[x][y] = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+            }
+        }
+
+        // Sobel operators
+        int[][] sobelX = {
+                {-1, 0, 1},
+                {-2, 0, 2},
+                {-1, 0, 1}
+        };
+
+        int[][] sobelY = {
+                {-1, -2, -1},
+                { 0,  0,  0},
+                { 1,  2,  1}
+        };
+
+        Bitmap output = Bitmap.createBitmap(width, height, input.getConfig());
+
+        // Apply Sobel operator
+        for (int x = 1; x < width - 1; x++) {
+            for (int y = 1; y < height - 1; y++) {
+                int gx = 0;
+                int gy = 0;
+
+                // Convolve with Sobel kernels
+                for (int i = -1; i <= 1; i++) {
+                    for (int j = -1; j <= 1; j++) {
+                        int pixel = grayPixels[x + i][y + j];
+                        gx += pixel * sobelX[i + 1][j + 1];
+                        gy += pixel * sobelY[i + 1][j + 1];
+                    }
+                }
+
+                // Calculate gradient magnitude
+                int magnitude = (int) Math.sqrt(gx * gx + gy * gy);
+                magnitude = clamp(magnitude);
+
+                // Invert for better visibility (white edges on black background)
+                magnitude = 255 - magnitude;
+
+                output.setPixel(x, y, Color.rgb(magnitude, magnitude, magnitude));
+            }
+        }
+
+        return output;
     }
 
     private static int clamp(int value) {

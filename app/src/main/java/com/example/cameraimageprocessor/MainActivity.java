@@ -44,6 +44,7 @@ public class MainActivity extends AppCompatActivity {
 
     private ImageCapture imageCapture;
     private ExecutorService cameraExecutor;
+    private ImageUploader imageUploader;  // NEW
 
     private ImageProcessor.FilterType selectedFilter = ImageProcessor.FilterType.NONE;
 
@@ -60,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
         setupFilterSpinner();
 
         cameraExecutor = Executors.newSingleThreadExecutor();
+        imageUploader = new ImageUploader();  // NEW
 
         if (checkPermissions()) {
             startCamera();
@@ -71,7 +73,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupFilterSpinner() {
-        String[] filters = {"None", "Grayscale", "Brightness", "Contrast", "Invert"};
+        String[] filters = {"None", "Grayscale", "Brightness", "Contrast", "Invert", "Edge Detection"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_dropdown_item, filters);
         filterSpinner.setAdapter(adapter);
@@ -182,11 +184,37 @@ public class MainActivity extends AppCompatActivity {
             out.flush();
             out.close();
 
-            runOnUiThread(() -> {
-                statusText.setText("Saved: " + processedFile.getName());
-                captureButton.setEnabled(true);
-                Toast.makeText(MainActivity.this,
-                        "Images saved to Pictures folder", Toast.LENGTH_LONG).show();
+            // Upload both images to web viewer
+            ImageUploader.uploadImage(originalFile, new ImageUploader.OnUploadListener() {
+                @Override
+                public void onSuccess() {
+                    runOnUiThread(() -> statusText.setText("Original uploaded"));
+                }
+
+                @Override
+                public void onFailure(String error) {
+                    runOnUiThread(() -> statusText.setText("Upload failed: " + error));
+                }
+            });
+
+            ImageUploader.uploadImage(processedFile, new ImageUploader.OnUploadListener() {
+                @Override
+                public void onSuccess() {
+                    runOnUiThread(() -> {
+                        statusText.setText("Images uploaded to web viewer!");
+                        captureButton.setEnabled(true);
+                        Toast.makeText(MainActivity.this,
+                                "Images uploaded and saved", Toast.LENGTH_LONG).show();
+                    });
+                }
+
+                @Override
+                public void onFailure(String error) {
+                    runOnUiThread(() -> {
+                        statusText.setText("Processed upload failed: " + error);
+                        captureButton.setEnabled(true);
+                    });
+                }
             });
 
         } catch (Exception e) {
@@ -196,7 +224,6 @@ public class MainActivity extends AppCompatActivity {
             });
         }
     }
-
     @Override
     protected void onDestroy() {
         super.onDestroy();
